@@ -1,8 +1,8 @@
 [workspace]
 license = "Apache-2.0"
 name = "op-cog-builder"
-version = "0.1.0"
-description = "Build and review one pure code candidate from an accepted contract. No automatic revisions or publication. Composed context calls require separately activated provider bindings."
+version = "0.2.0"
+description = "Design a pure-code Cog contract from a brief, pause for its acceptance, build and review one candidate, and pause for the candidate's acceptance. No automatic revisions or publication. Composed context calls require separately activated provider bindings."
 channels = ["conda-forge"]
 platforms = ["osx-arm64", "linux-64"]
 

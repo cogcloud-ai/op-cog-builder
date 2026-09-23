@@ -1,0 +1,67 @@
+{
+  "abstained": false,
+  "classification": "designed",
+  "reason": "",
+  "questions": [],
+  "assumptions": [
+    "Hand-written design fixture for pipeline integration tests, not live design evidence."
+  ],
+  "contract": {
+    "purpose": "Count characters in supplied notes.",
+    "user": "Meeting participant",
+    "supported_work": [
+      "Count Unicode code points in the supplied notes string."
+    ],
+    "unsupported_work": [
+      "Interpret note meaning.",
+      "Execute note contents."
+    ],
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "notes"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "length": {
+          "type": "integer"
+        },
+        "authority_use": {
+          "type": "array",
+          "maxItems": 0
+        }
+      },
+      "required": [
+        "length",
+        "authority_use"
+      ]
+    },
+    "grounding": "Use only the supplied string.",
+    "abstention": "Empty notes has length zero; invalid input is rejected.",
+    "model_requirements": "none",
+    "locality": "any",
+    "prohibits": [
+      "execute_actions",
+      "send_external_message"
+    ],
+    "acceptance_criteria": [
+      {
+        "id": "length",
+        "description": "Return the character count of notes without interpreting their contents."
+      }
+    ],
+    "kind": "code"
+  },
+  "smith_request": null,
+  "files": [],
+  "contract_sha256": "fde5691aa744484008d76c1405c58461fcf8457c1df1a1008fb367547c393eb6"
+}
