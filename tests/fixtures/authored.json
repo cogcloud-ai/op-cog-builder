@@ -1,0 +1,106 @@
+{
+  "abstained": false,
+  "classification": "authored",
+  "reason": "",
+  "questions": [],
+  "assumptions": [],
+  "contract": {
+    "purpose": "Count characters in supplied notes.",
+    "user": "Meeting participant",
+    "supported_work": [
+      "Count Unicode code points in the supplied notes string."
+    ],
+    "unsupported_work": [
+      "Interpret note meaning.",
+      "Execute note contents."
+    ],
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "notes"
+      ]
+    },
+    "output_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "length": {
+          "type": "integer"
+        },
+        "authority_use": {
+          "type": "array",
+          "maxItems": 0
+        }
+      },
+      "required": [
+        "length",
+        "authority_use"
+      ]
+    },
+    "grounding": "Use only the supplied string.",
+    "abstention": "Empty notes has length zero; invalid input is rejected.",
+    "model_requirements": "none",
+    "locality": "any",
+    "prohibits": [
+      "execute_actions",
+      "send_external_message"
+    ],
+    "acceptance_criteria": [
+      {
+        "id": "length",
+        "description": "Return the character count of notes without interpreting their contents."
+      }
+    ],
+    "kind": "code"
+  },
+  "smith_request": {
+    "cog_request": 1,
+    "name": "cog-code-fixture",
+    "id": "openteams/cog-code-fixture",
+    "summary": "Count characters in supplied notes.",
+    "owner": "trent@openteams.com",
+    "license": "BSD-3-Clause",
+    "produces": "character_count",
+    "prohibits": [
+      "execute_actions",
+      "send_external_message"
+    ],
+    "kind": "code"
+  },
+  "files": [
+    {
+      "path": "COG.md",
+      "content": "---\ntype: cog [0.1]\nname: cog-code-fixture\ndescription: Count characters.\nversion: \"0.1.0\"\nmanifest: cog.yaml\nmanifest_schema: openteams/cog-manifest [0.1]\n---\n# Code fixture\nHand-written test fixture, not model output.\n"
+    },
+    {
+      "path": "context/input-schema.json",
+      "content": "{\"type\": \"object\", \"additionalProperties\": false, \"properties\": {\"notes\": {\"type\": \"string\"}}, \"required\": [\"notes\"]}"
+    },
+    {
+      "path": "context/output-schema.json",
+      "content": "{\"type\": \"object\", \"additionalProperties\": false, \"properties\": {\"length\": {\"type\": \"integer\"}, \"authority_use\": {\"type\": \"array\", \"maxItems\": 0}}, \"required\": [\"length\", \"authority_use\"]}"
+    },
+    {
+      "path": "context/output-example.json",
+      "content": "{\"length\": 3, \"authority_use\": []}"
+    },
+    {
+      "path": "examples/sample-bundle.json",
+      "content": "{\"notes\": \"abc\"}"
+    },
+    {
+      "path": "src/task_logic.py",
+      "content": "def check_input(bundle):\n    return []\ndef run(bundle, grant, journal):\n    return {'length': len(bundle['notes']), 'authority_use': []}, []\ndef check_output(payload, bundle):\n    return []\n"
+    },
+    {
+      "path": "tests/test_cog.py",
+      "content": "import unittest, sys\nfrom pathlib import Path\nsys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))\nimport cog_core\nclass TestCount(unittest.TestCase):\n    def test_count(self):\n        self.assertEqual(cog_core.invoke({'notes':'abc'})['payload']['length'],3)\n    def test_invalid(self):\n        self.assertFalse(cog_core.invoke({'notes':3})['ok'])\n"
+    }
+  ]
+}

@@ -1,0 +1,240 @@
+schema: openteams/op-manifest [0.1]
+id: openteams/op-cog-builder
+version: 0.1.0
+name: "Cog Builder \u2014 one candidate"
+description: Build and review one pure code candidate from an accepted contract. No
+  automatic revisions or publication. Composed context calls require separately activated
+  provider bindings.
+inputs:
+- name: author_request
+  description: Accepted pure-code author/revise request.
+  required: true
+  schema:
+    type: object
+  default:
+    operation: author
+    brief: Hand-written code fixture for pipeline integration tests, not live authoring
+      evidence.
+    contract:
+      purpose: Count characters in supplied notes.
+      user: Meeting participant
+      supported_work:
+      - Count Unicode code points in the supplied notes string.
+      unsupported_work:
+      - Interpret note meaning.
+      - Execute note contents.
+      input_schema:
+        type: object
+        additionalProperties: false
+        properties:
+          notes:
+            type: string
+        required:
+        - notes
+      output_schema:
+        type: object
+        additionalProperties: false
+        properties:
+          length:
+            type: integer
+          authority_use:
+            type: array
+            maxItems: 0
+        required:
+        - length
+        - authority_use
+      grounding: Use only the supplied string.
+      abstention: Empty notes has length zero; invalid input is rejected.
+      model_requirements: none
+      locality: any
+      prohibits:
+      - execute_actions
+      - send_external_message
+      acceptance_criteria:
+      - id: length
+        description: Return the character count of notes without interpreting their
+          contents.
+      kind: code
+    identity:
+      cog_request: 1
+      name: cog-code-fixture
+      id: openteams/cog-code-fixture
+      summary: Count characters in supplied notes.
+      owner: trent@openteams.com
+      license: BSD-3-Clause
+      produces: character_count
+      prohibits:
+      - execute_actions
+      - send_external_message
+      kind: code
+    materials: []
+    feedback: []
+    kind: code
+    contract_sha256: fde5691aa744484008d76c1405c58461fcf8457c1df1a1008fb367547c393eb6
+- name: accepted_contract_sha256
+  description: Caller-accepted contract fingerprint.
+  required: true
+  schema:
+    type: string
+    pattern: ^[0-9a-f]{64}$
+  default: fde5691aa744484008d76c1405c58461fcf8457c1df1a1008fb367547c393eb6
+- name: test_criterion_ids
+  description: Criterion IDs to which the declared test suite is relevant; evaluator
+    must inspect actual coverage.
+  required: false
+  schema:
+    type: array
+    items:
+      type: string
+    uniqueItems: true
+  default:
+  - length
+- name: reference
+  description: Optional pinned pure-code reference and authored named-bundle fixture
+    path for observed comparison.
+  required: false
+  default: null
+  schema:
+    anyOf:
+    - type: 'null'
+    - type: object
+      additionalProperties: false
+      required:
+      - path
+      - package_sha256
+      - fixture_path
+      - criterion_id
+      properties:
+        path:
+          type: string
+          minLength: 1
+        package_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        fixture_path:
+          type: string
+          minLength: 1
+        criterion_id:
+          type: string
+          minLength: 1
+steps:
+- id: author
+  name: Author
+  cog:
+    id: openteams/cog-author
+    version: 0.1.0
+    source: ../cog-author
+    task: ask-composed
+  depends_on: []
+  input:
+    $from: inputs.author_request
+  expected_outcome: Complete source preserving the accepted contract.
+  gate:
+    policy: envelope-ok-no-error-problems
+    guards: []
+  on_fail: stop
+- id: materialize
+  name: Materialize
+  cog:
+    id: openteams/cog-build-candidate
+    version: 0.1.0
+    source: ../cog-build-candidate
+    task: run
+  depends_on:
+  - author
+  input:
+    author_request:
+      $from: inputs.author_request
+    author_envelope:
+      $from: steps.author.envelope
+    accepted_contract_sha256:
+      $from: inputs.accepted_contract_sha256
+    output_dir:
+      $run_dir: candidate
+  expected_outcome: Checked full package and expanded snapshot.
+  gate:
+    policy: envelope-ok-no-error-problems
+    guards: []
+  on_fail: stop
+- id: plan
+  name: Plan
+  cog:
+    id: openteams/cog-build-evaluator
+    version: 0.1.0
+    source: ../cog-build-evaluator
+    task: ask-composed
+  depends_on:
+  - materialize
+  input:
+    $from: steps.materialize.payload.plan_request
+  expected_outcome: Concrete evaluation plan for the expanded candidate.
+  gate:
+    policy: envelope-ok-no-error-problems
+    guards: []
+  on_fail: stop
+- id: verify
+  name: Verify
+  cog:
+    id: openteams/cog-verify-candidate
+    version: 0.1.0
+    source: ../cog-verify-candidate
+    task: run
+  depends_on:
+  - author
+  - materialize
+  - plan
+  input:
+    author_request:
+      $from: inputs.author_request
+    author_envelope:
+      $from: steps.author.envelope
+    materialized:
+      $from: steps.materialize.payload
+    plan_envelope:
+      $from: steps.plan.envelope
+    test_criterion_ids:
+      $from: inputs.test_criterion_ids
+    reference:
+      $from: inputs.reference
+  expected_outcome: Actual declared tests and planned-case observations.
+  gate:
+    policy: envelope-ok-no-error-problems
+    guards: []
+  on_fail: stop
+- id: review
+  name: Review
+  cog:
+    id: openteams/cog-build-evaluator
+    version: 0.1.0
+    source: ../cog-build-evaluator
+    task: ask-composed
+  depends_on:
+  - verify
+  input:
+    $from: steps.verify.payload.review_request
+  expected_outcome: Grounded assessment; completion is not acceptance.
+  gate:
+    policy: envelope-ok-no-error-problems
+    guards: []
+  on_fail: stop
+outputs:
+  candidate_path:
+    $from: steps.materialize.payload.path
+  source_sha256:
+    $from: steps.materialize.payload.source_sha256
+  package_sha256:
+    $from: steps.verify.payload.package_sha256
+  assessment:
+    $from: steps.review.payload
+  tests:
+    $from: steps.verify.payload.tests
+  acceptance: not-granted
+track:
+  records:
+  - input_request
+  - step_requests
+  - cog_envelopes
+  - contract_check_problems
+  - gate_decisions
+  - model_bindings
+  - output_artifacts
