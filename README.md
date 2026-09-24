@@ -194,11 +194,14 @@ cd ../cog-smith
 pixi run python src/cogsmith_cli.py op check ../op-cog-builder --tests --envelope
 ```
 
-The [0.1.0 live qualification report](docs/implementation-2026-09-21.md)
-records a fresh merge candidate built through the five build steps under real
-providers. The Gates added in 0.2.0 are documented in
-[acceptance-gates-2026-09-23.md](docs/acceptance-gates-2026-09-23.md); they have
-model-free evidence only until the next live run. See the
+The [0.2.0 live qualification](docs/live-gates-2026-09-23.md) built
+[cog-word-tally](https://github.com/cogcloud-ai/cog-word-tally) from a brief
+through both Gates under real providers: the first run stopped at review with
+a wrong assertion in the authored tests (and exposed a verifier/evaluator
+evidence gap), the second run, from the first run's source plus the finding,
+was accepted. The Gates' design is in
+[acceptance-gates-2026-09-23.md](docs/acceptance-gates-2026-09-23.md); the
+[0.1.0 report](docs/implementation-2026-09-21.md) covers the five build steps. See the
 [roadmap](https://github.com/cogcloud-ai/cog-op-builder/blob/main/docs/roadmap.md)
 for the bounded revision-cycle and Workbench UI work.
 
