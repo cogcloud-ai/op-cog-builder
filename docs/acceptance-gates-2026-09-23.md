@@ -2,7 +2,8 @@
 
 Closes the first acceptance criteria of
 [op-cog-builder#1](https://github.com/cogcloud-ai/op-cog-builder/issues/1) and
-plan gap 3 ("artifact acceptance Gates") in the coglab builder plan. The 0.1.0
+the "artifact acceptance Gates" gap recorded in the builder plan (an internal
+design note, not distributed). The 0.1.0
 Op started from a caller-supplied contract digest and always returned
 `acceptance: not-granted`. It now starts from a brief, pauses for an explicit
 decision over the exact designed contract, and pauses again for an explicit
@@ -12,7 +13,7 @@ decision over the exact reviewed candidate.
 
 | Component | Change | Verification |
 |---|---|---|
-| cog-smith Op machinery 0.7.0 | `gate.decides: artifact` with a declared `artifact` (kind, digests, id, summary, detail); `$sha256` mapping operator; artifact pending documents and decisions; `rejected` step/run status; rejected runs never resumed; no write grant from an artifact decision | 30 new tests (`tests/test_op_artifact_gate.py`); 584 earlier tests unchanged; rolled out to op-cog-builder, op-builder-smoke, op-project-triage, op-triage-survey (each suite re-run) |
+| cog-smith Op machinery 0.7.0 | `gate.decides: artifact` with a declared `artifact` (kind, digests, id, summary, detail); `$sha256` mapping operator; artifact pending documents and decisions; `rejected` step/run status; rejected runs never resumed; no write grant from an artifact decision | 30 new tests (`tests/test_op_artifact_gate.py`); 584 earlier tests unchanged; rolled out to op-cog-builder, op-builder-smoke and two internal Ops outside the suite (each suite re-run) |
 | op-cog-builder 0.2.0 | `design` step first; contract Gate on it; candidate Gate on `review`; inputs are brief/identity/kind/materials; outputs carry the verdicts, who decided, and the accepted artifact digest | 14 model-free tests; Smith Op check passes |
 | cog-author, cog-build-candidate, cog-verify-candidate, cog-build-evaluator, cog-workbench | unchanged | existing suites |
 

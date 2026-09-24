@@ -31,7 +31,7 @@ publishing, deployment, or replacement of a reference is implemented.
 ## The two acceptance artifacts
 
 Both Gates are the shared runner's artifact human Gate (Op machinery 0.7.0,
-`cog-smith/BUILDING_OPS.md` §6). Each pause writes `runs/<id>/pending/<step>.json`
+[cog-smith's BUILDING_OPS.md](https://github.com/cogcloud-ai/cog-smith/blob/main/BUILDING_OPS.md) §6). Each pause writes `runs/<id>/pending/<step>.json`
 (`openteams/op-pending-decision [0.1]`) with the artifact, its canonical
 `artifact_sha256`, the step payload and `payload_sha256`, plus a readable
 `<step>.md`.

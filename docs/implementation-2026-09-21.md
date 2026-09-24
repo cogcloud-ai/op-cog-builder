@@ -57,6 +57,10 @@ produced a fresh `cog-merge-findings-op-candidate` package snapshot. Its merge
 implementation remains byte-identical to the previous candidate; its authored
 documentation and test setup were revised. This qualifies the Op's revision
 input path, not a claim of an independently invented new merge algorithm.
+The reference named below is an earlier internal merge implementation used
+only as a comparison baseline; it is not distributed, and the published
+[cog-merge-findings-candidate](https://github.com/cogcloud-ai/cog-merge-findings-candidate)
+is the preserved candidate from the same lineage.
 
 The first planner output contained `kind: bogus`. The evaluator's packaged
 checks reported schema and coverage errors, and the Op stopped before running
@@ -87,13 +91,12 @@ Source fingerprint:
 Executed package fingerprint:
 `bc394984c8b41ca743b45842fe016ade6ef5cb074f39292025d1691d8ca26f65`.
 
-Local evidence: [Track](../runs/20260922T014600Z-f98016ad/track.json),
-[completion record](../runs/20260922T014600Z-f98016ad/completion-record.json),
-[final review](../runs/20260922T014600Z-f98016ad/envelopes/review.json),
-[initial rejected plan](../runs/20260922T014600Z-f98016ad/initial-plan-failure.json),
-and [generated candidate](../runs/20260922T014600Z-f98016ad/candidate/cog-merge-findings-op-candidate/COG.md).
-These raw files are in ignored runs/ and are not a portable or redacted release
-bundle. The executed Op spec is retained beside the Track as `executed-op.yaml`.
+Local evidence for this run (its `track.json`, `completion-record.json`,
+`envelopes/review.json`, `initial-plan-failure.json`, and the generated
+candidate's `COG.md`) lives under the ignored `runs/20260922T014600Z-f98016ad/`
+directory of the machine that ran it. These raw files are not a portable or
+redacted release bundle and are not distributed. The executed Op spec is
+retained beside the Track as `executed-op.yaml`.
 
 ## Public-preview evidence scope
 
