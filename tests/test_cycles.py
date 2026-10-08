@@ -25,12 +25,12 @@ class BuilderCycleTests(unittest.TestCase):
                 'provenance': {'source': 'synthetic-cycle-test-not-live-inference'}})
         return fixtures.PipelineTests.invoke(self, cog_dir, task, request_path, *args, **kwargs)
 
-    def start(self, attempts=3, cost=12):
+    def start(self, attempts=3, cost=12, policy=None):
         self.bad = copy.deepcopy(self.authored)
         test = next(row for row in self.bad['files'] if row['path'] == 'tests/test_cog.py')
         test['content'] += '\nclass RepairRequired(unittest.TestCase):\n    def test_repair_required(self):\n        self.fail("Synthetic first candidate needs repair")\n'
         request = json.loads((fixtures.ROOT / 'examples/request.json').read_text())
-        request.update(max_attempts=attempts, max_cost_units=cost,
+        request.update(execution_policy=policy or {'mode':'trusted-local','timeout_seconds':7},max_attempts=attempts, max_cost_units=cost,
                        build_origin={'proposal_sha256': 'a'*64, 'missing_cog_id': 'missing-'+'b'*64})
         path = Path(self.temp.name) / 'cycle-request.json'; path.write_text(json.dumps(request))
         with patch.object(fixtures.op_runner, 'invoke_cog', side_effect=self.invoke):
@@ -54,6 +54,12 @@ class BuilderCycleTests(unittest.TestCase):
         self.assertEqual(json.loads(Path(reviews[0]['envelope']).read_text())['payload']['classification'], 'revise')
         self.assertEqual(json.loads(Path(reviews[1]['envelope']).read_text())['payload']['classification'], 'pass')
         self.assertNotEqual(Path(state['phases'][0]['run_dir']), Path(state['phases'][1]['run_dir']))
+        for track in tracks:
+            verified = next(row for row in track['steps'] if row['id'] == 'verify')
+            self.assertEqual(json.loads(Path(verified['request']).read_text())['execution_policy']['timeout_seconds'], 7)
+            materialized = next(row for row in track['steps'] if row['id'] == 'materialize')
+            self.assertTrue(Path(json.loads(Path(materialized['envelope']).read_text())['payload']['path']).is_dir())
+        self.assertEqual(author_requests[2]['revision']['accepted_contract_sha256'], self.pending(first)['artifact']['digests']['contract'])
         artifact = self.pending(candidate)['artifact']
         self.assertEqual(artifact['detail']['build_origin'], {'proposal_sha256': 'a'*64, 'missing_cog_id': 'missing-'+'b'*64})
         code, accepted = self.resume(candidate, self.decide(candidate)); self.assertEqual(code, 0, accepted)
@@ -67,3 +73,16 @@ class BuilderCycleTests(unittest.TestCase):
         self.assertEqual(stopped['attempts'], 1)
         self.assertTrue((Path(stopped['run_dir']) / 'candidate/cog-code-fixture').is_dir())
         self.assertEqual([b['operation'] for name, b in self.requests if name == 'cog-author'], ['design', 'author'])
+
+    def test_cost_exhaustion_retains_no_extra_author_invocation(self):
+        code, contract = self.start(cost=1)
+        code, stopped = self.resume(contract, self.decide(contract))
+        self.assertEqual(stopped['status'], 'budget-exhausted')
+        self.assertEqual(stopped['cost_units_reserved'], 1)
+        self.assertEqual([b['operation'] for name,b in self.requests if name=='cog-author'], ['design'])
+
+    def test_all_transition_specs_forward_policy(self):
+        phases = fixtures.op_spec.cycle_phases(fixtures.op_spec.load(fixtures.ROOT/'op.yaml').doc)
+        for outcome, phase in phases.items():
+            verify = next(s for s in phase['steps'] if s['id']=='verify')
+            self.assertEqual(verify['input']['execution_policy'], {'$from':'inputs.execution_policy'}, outcome)

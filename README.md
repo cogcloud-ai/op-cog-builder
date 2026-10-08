@@ -44,8 +44,8 @@ consumer, provider, model binding or Workbench host invalidate reuse as appropri
 pixi run cycle -- --request examples/request.json
 ```
 
-The JSON result identifies `cycle_dir` and `active_run_dir`. Read the native
-pending document in `active_run_dir/pending/design.md`. Prepare a decision using
+The JSON result identifies `cycle_dir` and `run_dir`. Read the native
+pending document in `run_dir/pending/design.md`. Prepare a decision using
 Smith, then pass it to the cycle. Substitute the returned paths:
 
 ```sh
@@ -130,3 +130,10 @@ fixtures and do not claim live model qualification, publication or deployment.
 
 Copyright 2026 OpenTeams. Licensed under the [Apache License 2.0](LICENSE).
 Previously published BSD-3-Clause versions remain available under that license.
+
+A revision with error findings outside `revision_paths` stops as `failed` with
+the preparation refusal retained. Resume cannot widen that immutable scope;
+start a new build with reviewed paths. Evidence rounds ask the same plan question
+again and may differ through model variation; they do not currently feed review
+feedback to the planner. Model-free tests clean their temporary Tracks on exit;
+inspect retained Tracks from an actual build for the comparison exercise.

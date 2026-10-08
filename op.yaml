@@ -477,6 +477,8 @@ cycle:
               $from: inputs.test_criterion_ids
             reference:
               $from: inputs.reference
+            execution_policy:
+              $from: inputs.execution_policy
           depends_on:
           - design
           - author
@@ -500,3 +502,5 @@ cycle:
               $from: inputs.test_criterion_ids
             reference:
               $from: inputs.reference
+            execution_policy:
+              $from: inputs.execution_policy
