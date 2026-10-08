@@ -10,3 +10,5 @@ runs/
 model.json
 .op-composition.json
 var/
+
+/cycles/
