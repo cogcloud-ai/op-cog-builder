@@ -21,7 +21,7 @@ jobs:
         with:
           repository: cogcloud-ai/cog-op-builder
           # Published companion API pins for the bounded-cycle integration.
-          ref: b1e71cef2ecbe6b489ecaac2ca35100957c3d801
+          ref: 04c5dd6833536729a4b80cb393687bf93e7ae6d0
           path: workspace/cog-op-builder
           persist-credentials: false
       - uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e # v0.10.2
