@@ -1,11 +1,10 @@
 schema: openteams/op-manifest [0.1]
 id: openteams/op-cog-builder
 version: 0.2.0
-name: "Cog Builder — one candidate, two acceptance Gates"
-description: Design a pure-code Cog contract from a brief, pause for its acceptance,
-  build and review one candidate, and pause for the candidate's acceptance. No
-  automatic revisions or publication. Composed context calls require separately
-  activated provider bindings.
+name: "Cog Builder \u2014 bounded revisions, two acceptance Gates"
+description: Design and accept a pure-code Cog contract, build and review candidates
+  within fixed attempt and invocation-cost budgets, and explicitly accept the final
+  candidate. Retain every candidate and review.
 inputs:
 - name: brief
   description: One bounded Cog brief in plain language.
@@ -17,7 +16,8 @@ inputs:
     evidence. Count Unicode code points in a supplied notes string; never interpret
     or execute the notes.
 - name: identity
-  description: The Smith identity (cog_request v1) the accepted contract is built under.
+  description: The Smith identity (cog_request v1) the accepted contract is built
+    under.
   required: true
   schema:
     type: object
@@ -56,8 +56,7 @@ inputs:
     items:
       type: string
     uniqueItems: true
-  default:
-  - length
+  default: []
 - name: reference
   description: Optional pinned pure-code reference and authored named-bundle fixture
     path for observed comparison.
@@ -86,6 +85,60 @@ inputs:
         criterion_id:
           type: string
           minLength: 1
+- name: max_attempts
+  required: false
+  default: 3
+  description: Maximum build/evidence rounds in a cycle.
+  schema:
+    type: integer
+    minimum: 1
+- name: max_cost_units
+  required: false
+  default: 12
+  description: Maximum reserved model-turn units across the cycle; not vendor billing.
+  schema:
+    type: integer
+    minimum: 0
+- name: revision_paths
+  required: false
+  default:
+  - src/task_logic.py
+  - tests/test_cog.py
+  description: Only these author-owned files may change during automatic repair.
+  schema:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+- name: execution_policy
+  required: false
+  default:
+    mode: trusted-local
+  description: Explicit verifier policy; Docker mode requires a pinned local image.
+  schema:
+    type: object
+- name: build_origin
+  required: false
+  default: null
+  description: Optional stable designer proposal/missing-Cog identity, retained in
+    candidate acceptance.
+  schema:
+    anyOf:
+    - type: 'null'
+    - type: object
+      additionalProperties: false
+      required:
+      - proposal_sha256
+      - missing_cog_id
+      properties:
+        proposal_sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+        missing_cog_id:
+          type: string
+          pattern: ^missing-[a-f0-9]{64}$
 steps:
 - id: design
   name: Design the contract
@@ -109,10 +162,6 @@ steps:
       $from: inputs.kind
   expected_outcome: A complete work contract for the brief, or questions (which fail
     this Gate by name, since nothing is decidable).
-  # The CONTRACT acceptance Gate. The person accepts or rejects the exact
-  # contract the designer produced, bound to its canonical digest and to
-  # the identity it is built under. Nothing downstream runs until accepted;
-  # a rejection ends the run.
   gate:
     policy: human
     decides: artifact
@@ -122,7 +171,7 @@ steps:
         $from: inputs.identity.id
       summary:
         $from: steps.design.payload.contract.purpose
-        $default: ""
+        $default: ''
       detail:
         classification:
           $from: steps.design.payload.classification
@@ -152,8 +201,6 @@ steps:
     task: ask-composed
   depends_on:
   - design
-  # The author is given the ACCEPTED contract and the digest the person
-  # accepted; its own preflight refuses a contract that does not hash to it.
   input:
     operation: author
     brief:
@@ -261,6 +308,8 @@ steps:
       $from: steps.materialize.payload
     plan_envelope:
       $from: steps.plan.envelope
+    execution_policy:
+      $from: inputs.execution_policy
     test_criterion_ids:
       $from: inputs.test_criterion_ids
     reference:
@@ -282,10 +331,6 @@ steps:
   input:
     $from: steps.verify.payload.review_request
   expected_outcome: Grounded assessment; completion is review, not acceptance.
-  # The CANDIDATE acceptance Gate. Review completing is not acceptance: the
-  # person accepts or rejects THIS candidate, bound to the accepted contract,
-  # the exact source and package digests, the verification evidence and the
-  # assessment. A rejection ends the run; the next candidate is a new run.
   gate:
     policy: human
     decides: artifact
@@ -305,6 +350,8 @@ steps:
         findings:
           $from: steps.review.payload.findings
           $default: []
+        build_origin:
+          $from: inputs.build_origin
       digests:
         contract:
           $from: steps.design.decision.artifact.digests.contract
@@ -351,3 +398,111 @@ track:
   - gate_decisions
   - model_bindings
   - output_artifacts
+cycle:
+  terminal_errors:
+    revision-request: [invalid-revision]
+  outcome_step: review
+  outcome_field: classification
+  max_attempts:
+    $from: inputs.max_attempts
+  max_cost_units:
+    $from: inputs.max_cost_units
+  costs:
+    design: 1
+    author: 1
+    materialize: 0
+    plan: 1
+    verify: 0
+    review: 1
+    revision-request: 0
+  transitions:
+    revise:
+      restart: author
+      prepare:
+      - id: revision-request
+        name: Prepare candidate-bound revision request
+        cog:
+          id: openteams/cog-author
+          version: 0.1.0
+          source: ../cog-author
+          task: prepare-revision
+        input:
+          author_request:
+            $from: inputs.cycle_previous.steps.author.request
+          author_envelope:
+            $from: inputs.cycle_previous.steps.author.envelope
+          review_request:
+            $from: inputs.cycle_previous.steps.verify.payload.review_request
+          review_envelope:
+            $from: inputs.cycle_previous.steps.review.envelope
+          allowed_change_scope:
+            paths:
+              $from: inputs.revision_paths
+        expected_outcome: Exact prior source, immutable accepted contract and candidate-bound
+          review in a scoped revision receipt.
+        gate:
+          policy: envelope-ok-no-error-problems
+          guards: []
+        on_fail: stop
+      replace:
+        author:
+          input:
+            $from: steps.revision-request.payload.request
+          depends_on:
+          - design
+          - revision-request
+        materialize:
+          input:
+            author_request:
+              $from: steps.revision-request.payload.request
+            author_envelope:
+              $from: steps.author.envelope
+            accepted_contract_sha256:
+              $from: steps.design.decision.artifact.digests.contract
+            output_dir:
+              $run_dir: candidate
+          depends_on:
+          - design
+          - author
+          - revision-request
+        verify:
+          input:
+            author_request:
+              $from: steps.revision-request.payload.request
+            author_envelope:
+              $from: steps.author.envelope
+            materialized:
+              $from: steps.materialize.payload
+            plan_envelope:
+              $from: steps.plan.envelope
+            test_criterion_ids:
+              $from: inputs.test_criterion_ids
+            reference:
+              $from: inputs.reference
+            execution_policy:
+              $from: inputs.execution_policy
+          depends_on:
+          - design
+          - author
+          - materialize
+          - plan
+          - revision-request
+    insufficient_evidence:
+      restart: plan
+      replace:
+        verify:
+          input:
+            author_request:
+              $from: inputs.cycle_previous.steps.verify.request.author_request
+            author_envelope:
+              $from: steps.author.envelope
+            materialized:
+              $from: steps.materialize.payload
+            plan_envelope:
+              $from: steps.plan.envelope
+            test_criterion_ids:
+              $from: inputs.test_criterion_ids
+            reference:
+              $from: inputs.reference
+            execution_policy:
+              $from: inputs.execution_policy
