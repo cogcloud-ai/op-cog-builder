@@ -112,7 +112,7 @@ proposal and recheck all digests before composing the final Op.
 ## Compatibility and validation
 
 `pixi run op` remains the original single-candidate operation. `pixi run cycle`
-adds bounded repair orchestration using shared Op machinery 0.9.2, with no
+adds bounded repair orchestration using shared Op machinery 0.9.3, with no
 per-Op Python logic. Model-free tests exercise the acceptance Gates,
 changed-artifact refusal, reference observations, native revision preparation,
 real candidate packaging/verification, repaired review and budget exhaustion.
