@@ -107,7 +107,7 @@ class BuilderCycleTests(unittest.TestCase):
         code, contract = self.start()
         code, refused = self.resume(contract,self.decide(contract))
         self.assertEqual(code,1,refused);self.assertEqual(refused['status'],'refused',refused)
-        self.assertIn('scope',refused['reason'].lower())
+        self.assertIn('outside the allowed-change paths',refused['reason'])
         state=json.loads(Path(refused['cycle']).read_text())
         track=json.loads((Path(state['phases'][-1]['run_dir'])/'track.json').read_text())
         failed=next(row for row in track['steps'] if row['id']=='revision-request')
