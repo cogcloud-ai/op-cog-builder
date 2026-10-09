@@ -85,9 +85,10 @@ identity. `kind` is `code`. Materials are data. Optional inputs include
 `reference`, `execution_policy` and designer `build_origin`.
 
 By default only `src/task_logic.py` and `tests/test_cog.py` may change during
-repair. The Author's deterministic `prepare-revision` task binds the full original
-request, accepted contract, candidate digest, actual clean review and permitted
-paths/criteria. Contract or out-of-scope changes are refused. Missing evidence
+repair. The Author's deterministic `prepare-revision` task retains the original
+request and binds the current candidate, accepted contract, candidate digest, actual clean review and permitted
+paths. Criterion IDs and retained originals are advisory context; the
+receipt does not authenticate them. Contract or out-of-scope changes are refused. Missing evidence
 reuses candidate bytes and prepares new observations rather than redesigning.
 
 Learners can leave `test_criterion_ids` empty. The declared test result is retained
@@ -111,8 +112,8 @@ proposal and recheck all digests before composing the final Op.
 ## Compatibility and validation
 
 `pixi run op` remains the original single-candidate operation. `pixi run cycle`
-adds bounded repair orchestration using shared Op machinery 0.9.0, with no
-per-Op Python logic. Sixteen model-free tests exercise the acceptance Gates,
+adds bounded repair orchestration using shared Op machinery 0.9.2, with no
+per-Op Python logic. Model-free tests exercise the acceptance Gates,
 changed-artifact refusal, reference observations, native revision preparation,
 real candidate packaging/verification, repaired review and budget exhaustion.
 
@@ -126,14 +127,27 @@ The earlier [live qualification](docs/live-gates-2026-09-23.md) documents the
 single-candidate implementation. New bounded-cycle tests use synthetic inference
 fixtures and do not claim live model qualification, publication or deployment.
 
-## License
-
-Copyright 2026 OpenTeams. Licensed under the [Apache License 2.0](LICENSE).
-Previously published BSD-3-Clause versions remain available under that license.
-
-A revision with error findings outside `revision_paths` stops as `failed` with
+A revision with error findings outside `revision_paths` stops as terminal `refused` with
 the preparation refusal retained. Resume cannot widen that immutable scope;
 start a new build with reviewed paths. Evidence rounds ask the same plan question
 again and may differ through model variation; they do not currently feed review
 feedback to the planner. Model-free tests clean their temporary Tracks on exit;
 inspect retained Tracks from an actual build for the comparison exercise.
+
+
+Run the model-free interruption exercise from this package:
+
+```sh
+pixi run python -m unittest discover -s tests -p test_cycles.py -k native_answer_survives_interruption -v
+```
+
+The fixture raises after a durable Author answer, checks the retained reservation
+and running status, then resumes without another Author turn. Read that test
+while tracing the phase and Track files; its temporary artifacts are cleaned on
+exit. An out-of-scope `invalid-revision` error is declared terminal in `op.yaml`,
+so repeated resume retains the refusal and invokes nothing.
+
+## License
+
+Copyright 2026 OpenTeams. Licensed under the [Apache License 2.0](LICENSE).
+Previously published BSD-3-Clause versions remain available under that license.

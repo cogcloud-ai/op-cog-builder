@@ -7,6 +7,7 @@ import unittest
 
 import test_pipeline as fixtures
 import op_cycle
+import op_track
 
 
 class BuilderCycleTests(unittest.TestCase):
@@ -23,7 +24,17 @@ class BuilderCycleTests(unittest.TestCase):
             payload = self.bad if bundle['operation'] == 'author' else self.authored
             return self.suite.bridge('cog-author', 'finish', {'bundle': bundle, 'result': payload,
                 'provenance': {'source': 'synthetic-cycle-test-not-live-inference'}})
-        return fixtures.PipelineTests.invoke(self, cog_dir, task, request_path, *args, **kwargs)
+        result = fixtures.PipelineTests.invoke(self, cog_dir, task, request_path, *args, **kwargs)
+        if Path(cog_dir).name == 'cog-build-evaluator' and bundle.get('operation') == 'review':
+            payload = result['payload']
+            if getattr(self, 'outside_scope', False):
+                payload['findings'] = [{'severity':'error','quote':next(row['content'][:40] for row in bundle['files'] if row['path']=='COG.md'),'detail':'Unrelated contract change','path':'COG.md'}]
+            if getattr(self, 'missing_evidence_once', False):
+                self.missing_evidence_once = False
+                payload['classification'] = 'insufficient_evidence'
+                payload['assessments'][0]['status'] = 'not_tested'
+            result = self.suite.bridge('cog-build-evaluator','finish',{'bundle':bundle,'result':payload,'provenance':{'source':'synthetic-cycle-test'}})
+        return result
 
     def start(self, attempts=3, cost=12, policy=None):
         self.bad = copy.deepcopy(self.authored)
@@ -52,6 +63,10 @@ class BuilderCycleTests(unittest.TestCase):
         tracks = [json.loads((Path(p['run_dir']) / 'track.json').read_text()) for p in state['phases']]
         reviews = [next(r for r in track['steps'] if r['id'] == 'review') for track in tracks]
         self.assertEqual(json.loads(Path(reviews[0]['envelope']).read_text())['payload']['classification'], 'revise')
+        verification=next(row for row in tracks[0]['steps'] if row['id']=='verify')
+        report=json.loads(Path(verification['envelope']).read_text())['payload']
+        self.assertIn('Synthetic first candidate needs repair',json.dumps(report['review_request']['evidence']))
+        self.assertTrue(all('timeout_seconds' in row for row in report['execution']['records']))
         self.assertEqual(json.loads(Path(reviews[1]['envelope']).read_text())['payload']['classification'], 'pass')
         self.assertNotEqual(Path(state['phases'][0]['run_dir']), Path(state['phases'][1]['run_dir']))
         for track in tracks:
@@ -86,3 +101,67 @@ class BuilderCycleTests(unittest.TestCase):
         for outcome, phase in phases.items():
             verify = next(s for s in phase['steps'] if s['id']=='verify')
             self.assertEqual(verify['input']['execution_policy'], {'$from':'inputs.execution_policy'}, outcome)
+
+    def test_out_of_scope_error_is_terminal_with_reason_and_no_repeated_prepare(self):
+        self.outside_scope = True
+        code, contract = self.start()
+        code, refused = self.resume(contract,self.decide(contract))
+        self.assertEqual(code,1,refused);self.assertEqual(refused['status'],'refused',refused)
+        self.assertIn('scope',refused['reason'].lower())
+        state=json.loads(Path(refused['cycle']).read_text())
+        track=json.loads((Path(state['phases'][-1]['run_dir'])/'track.json').read_text())
+        failed=next(row for row in track['steps'] if row['id']=='revision-request')
+        self.assertEqual(failed['status'],'failed')
+        self.assertEqual(json.loads(Path(failed['envelope']).read_text())['raw']['error']['code'],'invalid-revision')
+        before=len(self.requests)
+        with patch.object(fixtures.op_runner,'invoke_cog') as invoke:
+            code, again=op_cycle.resume(fixtures.ROOT,refused['cycle_dir'])
+        invoke.assert_not_called();self.assertEqual(len(self.requests),before)
+        self.assertEqual(again['status'],'refused')
+
+    def test_missing_evidence_round_reuses_candidate_and_policy(self):
+        self.missing_evidence_once = True
+        code, contract = self.start()
+        self.bad=copy.deepcopy(self.authored)
+        code, candidate=self.resume(contract,self.decide(contract))
+        self.assertEqual(code,3,candidate);self.assertEqual(candidate['attempts'],2)
+        self.assertEqual([b['operation'] for name,b in self.requests if name=='cog-author'],['design','author'])
+        state=json.loads(Path(candidate['cycle']).read_text())
+        materialized=[]
+        for phase in state['phases']:
+            track=json.loads((Path(phase['run_dir'])/'track.json').read_text())
+            materialize=next(row for row in track['steps'] if row['id']=='materialize')
+            materialized.append(json.loads(Path(materialize['envelope']).read_text())['payload']['path'])
+            verify=next(row for row in track['steps'] if row['id']=='verify')
+            self.assertEqual(json.loads(Path(verify['request']).read_text())['execution_policy']['timeout_seconds'],7)
+        self.assertEqual(materialized[0],materialized[1])
+        self.assertEqual(candidate['cost_units_reserved'],6)
+
+    def test_mid_repair_cost_exhaustion_preserves_new_candidate_before_next_plan(self):
+        code, contract=self.start(cost=5)
+        code, stopped=self.resume(contract,self.decide(contract))
+        self.assertEqual(stopped['status'],'budget-exhausted');self.assertEqual(stopped['cost_units_reserved'],5)
+        self.assertEqual([b['operation'] for name,b in self.requests if name=='cog-author'],['design','author','revise'])
+        self.assertEqual([b['operation'] for name,b in self.requests if name=='cog-build-evaluator'],['plan','review'])
+        state=json.loads(Path(stopped['cycle']).read_text())
+        track=json.loads((Path(state['phases'][-1]['run_dir'])/'track.json').read_text())
+        materialized=next(row for row in track['steps'] if row['id']=='materialize')
+        self.assertTrue(Path(json.loads(Path(materialized['envelope']).read_text())['payload']['path']).is_dir())
+        with patch.object(fixtures.op_runner,'invoke_cog') as invoke:
+            op_cycle.resume(fixtures.ROOT,stopped['cycle_dir'])
+        invoke.assert_not_called()
+
+    def test_native_answer_survives_interruption_without_second_author_turn(self):
+        code,contract=self.start()
+        save=op_track.save
+        def interrupt(track,directory):
+            if any(row['id']=='author' and row['status']=='passed' for row in track['steps']):
+                raise OSError('Synthetic interruption after durable author answer')
+            return save(track,directory)
+        with patch.object(op_track,'save',side_effect=interrupt),self.assertRaises(OSError):
+            self.resume(contract,self.decide(contract))
+        state=json.loads(Path(contract['cycle']).read_text())
+        self.assertEqual(state['status'],'running');self.assertEqual(state['cost_units_reserved'],2)
+        code,candidate=self.resume(contract)
+        self.assertEqual(code,3,candidate)
+        self.assertEqual([b['operation'] for name,b in self.requests if name=='cog-author'],['design','author','revise'])

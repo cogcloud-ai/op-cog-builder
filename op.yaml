@@ -399,6 +399,8 @@ track:
   - model_bindings
   - output_artifacts
 cycle:
+  terminal_errors:
+    revision-request: [invalid-revision]
   outcome_step: review
   outcome_field: classification
   max_attempts:
